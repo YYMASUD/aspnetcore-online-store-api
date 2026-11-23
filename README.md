@@ -158,6 +158,7 @@ erDiagram
 The API applies pending migrations automatically on startup. To run them manually:
 
 ```bash
+cd ../..
 dotnet ef database update \
   --project src/StoreApi.Infrastructure \
   --startup-project src/StoreApi.Infrastructure
@@ -190,12 +191,16 @@ dotnet ef database update \
 
 ## Default Admin Credentials
 
-The API creates a default admin account on first startup:
+The API creates an administrator account on first startup from configuration
+(`Admin:Email`, `Admin:Password`). The Docker defaults are:
 
-- **Email:** admin@storeapi.local (configurable via `Admin:Email`)
-- **Password:** Admin#Passw0rd (configurable via `Admin:Password`)
+- **Email:** admin@storeapi.local
+- **Password:** Admin#Passw0rd
 
-**⚠️ Important:** Change these credentials in production environments!
+These are **development defaults only** — override them via `.env`, user secrets, or
+environment variables (`ADMIN__EMAIL` / `ADMIN__PASSWORD`) before deploying anywhere real.
+If `Admin:Email` or `Admin:Password` is not configured, the seeder logs a warning and
+creates no account.
 
 ## API Endpoints
 

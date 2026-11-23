@@ -6,13 +6,11 @@ namespace StoreApi.Infrastructure.Persistence;
 
 /// <summary>
 /// Creates a <see cref="StoreDbContext"/> for the <c>dotnet ef</c> tooling so migrations
-/// can be generated without booting the API host.
+/// can be generated without booting the API host. The connection string is read from
+/// configuration or environment variables; no credential is hardcoded.
 /// </summary>
 public sealed class StoreDbContextFactory : IDesignTimeDbContextFactory<StoreDbContext>
 {
-    private const string FallbackConnectionString =
-        "Server=localhost,1433;Database=StoreApiDb;User Id=sa;Password=Your_password123;TrustServerCertificate=True";
-
     public StoreDbContext CreateDbContext(string[] args)
     {
         var configuration = new ConfigurationBuilder()
@@ -22,10 +20,14 @@ public sealed class StoreDbContextFactory : IDesignTimeDbContextFactory<StoreDbC
             .AddEnvironmentVariables()
             .Build();
 
-        var connectionString =
-            configuration.GetConnectionString("DefaultConnection")
-            ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-            ?? FallbackConnectionString;
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "Set ConnectionStrings:DefaultConnection (or the " +
+                "ConnectionStrings__DefaultConnection environment variable) before running dotnet ef.");
+        }
 
         var options = new DbContextOptionsBuilder<StoreDbContext>()
             .UseSqlServer(connectionString)
