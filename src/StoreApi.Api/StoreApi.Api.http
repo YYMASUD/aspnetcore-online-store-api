@@ -1,6 +1,96 @@
-@StoreApi.Api_HostAddress = http://localhost:5015
+@host = http://localhost:5015
+@token = PASTE_CUSTOMER_TOKEN_HERE
+@adminToken = PASTE_ADMIN_TOKEN_HERE
+@orderId = 1
 
-GET {{StoreApi.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Health
+GET {{host}}/health
 
-###
+### Register
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "email": "alice@example.com",
+  "password": "Passw0rd!23"
+}
+
+### Login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "Passw0rd!23"
+}
+
+### Current user
+GET {{host}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### List categories
+GET {{host}}/api/categories
+
+### List products (search + sort + pagination)
+GET {{host}}/api/products?search=wool&sortBy=price_asc&page=1&pageSize=10
+
+### Product details
+GET {{host}}/api/products/5
+
+### View cart
+GET {{host}}/api/cart
+Authorization: Bearer {{token}}
+
+### Add to cart
+POST {{host}}/api/cart
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "productId": 5,
+  "quantity": 2
+}
+
+### Update cart quantity
+PUT {{host}}/api/cart/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "quantity": 3
+}
+
+### Checkout
+POST {{host}}/api/orders/checkout
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "shippingAddress": "221B Baker Street, London"
+}
+
+### My orders
+GET {{host}}/api/orders/my
+Authorization: Bearer {{token}}
+
+### Order details
+GET {{host}}/api/orders/{{orderId}}
+Authorization: Bearer {{token}}
+
+### Admin: all orders
+GET {{host}}/api/orders?status=0&page=1&pageSize=10
+Authorization: Bearer {{adminToken}}
+
+### Admin: mark order paid
+PUT {{host}}/api/orders/{{orderId}}/status
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "status": 1
+}
+
+### Customer: cancel own pending order
+PUT {{host}}/api/orders/{{orderId}}/cancel
+Authorization: Bearer {{token}}

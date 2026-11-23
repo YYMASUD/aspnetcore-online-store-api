@@ -155,11 +155,13 @@ erDiagram
    dotnet user-secrets set "Admin:Password" "Admin#Passw0rd"
    ```
 
-3. **Run migrations:**
-   ```bash
-   cd ../..
-   dotnet ef database update --project src/StoreApi.Infrastructure --startup-project src/StoreApi.Api
-   ```
+The API applies pending migrations automatically on startup. To run them manually:
+
+```bash
+dotnet ef database update \
+  --project src/StoreApi.Infrastructure \
+  --startup-project src/StoreApi.Infrastructure
+```
 
 4. **Run the API:**
    ```bash
@@ -167,7 +169,7 @@ erDiagram
    ```
 
 5. **Access Swagger UI:**
-   Open https://localhost:5001/swagger in your browser.
+   Open http://localhost:5015/swagger in your browser (the `http` launch profile).
 
 ### Docker
 
@@ -308,8 +310,11 @@ curl -X POST http://localhost:5000/api/orders/checkout \
 dotnet test
 ```
 
-- **27 unit tests** covering validators, domain logic, and business rules
-- **15 integration tests** covering auth, catalog, cart, and order endpoints
+- **106 unit tests** covering validators, domain rules, stock transitions, and cart/checkout logic
+- **27 integration tests** covering auth, catalog, cart, order endpoints, and authorization checks
+
+Integration tests run the real API in-process via `WebApplicationFactory` against an in-memory
+SQLite database, so they need no external services.
 
 ## Future Improvements
 
