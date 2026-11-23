@@ -55,7 +55,6 @@ public sealed class OrderService(IApplicationDbContext db) : IOrderService
         try
         {
             var cartItems = await db.CartItems
-                .Include(x => x.Product)
                 .Where(x => x.UserId == userId)
                 .ToListAsync(cancellationToken);
 
@@ -120,6 +119,11 @@ public sealed class OrderService(IApplicationDbContext db) : IOrderService
             throw new ConflictException(
                 "Stock changed during checkout. Please review your cart and try again.");
         }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task<PagedResult<OrderDto>> GetMyOrdersAsync(
@@ -134,13 +138,21 @@ public sealed class OrderService(IApplicationDbContext db) : IOrderService
         bool isAdmin,
         CancellationToken cancellationToken = default)
     {
-        var order = await LoadOrderWithItemsAsync(id, cancellationToken)
-                    ?? throw new NotFoundException($"Order {id} was not found.");
+        // Admins may read any order; customers are scoped to their own rows so another
+        // user's order id is indistinguishable from a non-existent one.
+        var query = db.Orders
+            .AsNoTracking()
+            .Include(x => x.Items)
+            .ThenInclude(x => x.Product)
+            .AsQueryable();
 
-        if (!isAdmin && order.UserId != userId)
+        if (!isAdmin)
         {
-            throw new ForbiddenException("You do not have permission to view this order.");
+            query = query.Where(x => x.UserId == userId);
         }
+
+        var order = await query.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+                    ?? throw new NotFoundException($"Order {id} was not found.");
 
         return Map(order);
     }
@@ -162,6 +174,13 @@ public sealed class OrderService(IApplicationDbContext db) : IOrderService
         {
             throw new BadRequestException(
                 $"Cannot change order status from {order.Status} to {request.Status}.");
+        }
+
+        // Cancellation always restores reserved stock, whether triggered by the customer
+        // endpoint or an admin changing status to Cancelled.
+        if (request.Status == OrderStatus.Cancelled)
+        {
+            return await CancelWithRestockAsync(order, customerInitiated: false, cancellationToken);
         }
 
         order.ChangeStatus(request.Status);
@@ -188,6 +207,18 @@ public sealed class OrderService(IApplicationDbContext db) : IOrderService
             throw new BadRequestException("Only pending orders can be cancelled by a customer.");
         }
 
+        return await CancelWithRestockAsync(order, customerInitiated: true, cancellationToken);
+    }
+
+    /// <summary>
+    /// The single cancellation path. Restores every item's reserved stock and flips the
+    /// status inside one transaction so stock and order state can never diverge.
+    /// </summary>
+    private async Task<OrderDto> CancelWithRestockAsync(
+        Order order,
+        bool customerInitiated,
+        CancellationToken cancellationToken)
+    {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         try
@@ -200,7 +231,14 @@ public sealed class OrderService(IApplicationDbContext db) : IOrderService
                 product.RestoreStock(item.Quantity);
             }
 
-            order.Status = OrderStatus.Cancelled;
+            if (customerInitiated)
+            {
+                order.Cancel();
+            }
+            else
+            {
+                order.ChangeStatus(OrderStatus.Cancelled);
+            }
 
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -210,8 +248,12 @@ public sealed class OrderService(IApplicationDbContext db) : IOrderService
         catch (DbUpdateConcurrencyException)
         {
             await transaction.RollbackAsync(cancellationToken);
-            throw new ConflictException(
-                "Stock changed during cancellation. Please try again.");
+            throw new ConflictException("Stock changed during cancellation. Please try again.");
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
         }
     }
 
@@ -242,7 +284,6 @@ public sealed class OrderService(IApplicationDbContext db) : IOrderService
             .ThenByDescending(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Include(x => x.Items)
             .Select(x => new OrderDto(
                 x.Id,
                 x.UserId,

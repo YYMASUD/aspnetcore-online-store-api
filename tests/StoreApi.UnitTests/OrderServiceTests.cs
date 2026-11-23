@@ -162,6 +162,20 @@ public class OrderServiceTests : UnitTestBase
     }
 
     [Fact]
+    public async Task UpdateStatusAsync_CancelledByAdmin_ShouldRestoreStock()
+    {
+        var (_, orderId) = await PlaceOrderAsync(quantity: 4, stock: 10);
+        (await Db.Products.AsNoTracking().FirstAsync()).Stock.Should().Be(6);
+
+        var service = new OrderService(Db);
+        var cancelled = await service.UpdateStatusAsync(
+            orderId, new UpdateOrderStatusDto(OrderStatus.Cancelled));
+
+        cancelled.Status.Should().Be(OrderStatus.Cancelled);
+        (await Db.Products.AsNoTracking().FirstAsync()).Stock.Should().Be(10);
+    }
+
+    [Fact]
     public async Task CancelAsync_ShouldRestoreStock()
     {
         var (userId, orderId) = await PlaceOrderAsync(quantity: 3, stock: 10);
@@ -197,14 +211,15 @@ public class OrderServiceTests : UnitTestBase
     }
 
     [Fact]
-    public async Task GetByIdAsync_OtherUsersOrder_ShouldThrowForbiddenUnlessAdmin()
+    public async Task GetByIdAsync_OtherUsersOrder_ShouldBeHiddenUnlessAdmin()
     {
         var (_, orderId) = await PlaceOrderAsync();
         var (other, _) = SeedProduct();
         var service = new OrderService(Db);
 
+        // Non-owners see a 404 so order ids cannot be probed.
         await FluentActions.Awaiting(() => service.GetByIdAsync(other.Id, orderId, isAdmin: false))
-            .Should().ThrowAsync<ForbiddenException>();
+            .Should().ThrowAsync<NotFoundException>();
 
         var asAdmin = await service.GetByIdAsync(other.Id, orderId, isAdmin: true);
         asAdmin.Id.Should().Be(orderId);

@@ -489,6 +489,8 @@ $RECYCLE.BIN/
 !.env.example
 appsettings.Development.json
 appsettings.Local.json
+appsettings.Production.json
+appsettings.Staging.json
 
 # Local runtime artefacts
 logs/

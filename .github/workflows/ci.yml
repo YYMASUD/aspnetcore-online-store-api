@@ -66,6 +66,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate compose file
+        env:
+          MSSQL_SA_PASSWORD: 'YourStrong@Passw0rd'
+          JWT__KEY: 'ci-signing-key-must-be-at-least-32-bytes-long'
+          ADMIN__EMAIL: 'admin@storeapi.local'
+          ADMIN__PASSWORD: 'Admin#Passw0rd'
         run: docker compose config
 
       - name: Build image
@@ -77,7 +82,7 @@ jobs:
           JWT__KEY: 'ci-signing-key-must-be-at-least-32-bytes-long'
           ADMIN__EMAIL: 'admin@storeapi.local'
           ADMIN__PASSWORD: 'Admin#Passw0rd'
-        run: docker compose up -d --wait --wait-timeout 300
+        run: docker compose up -d --build --wait --wait-timeout 300
 
       - name: Verify health endpoint
         run: |
@@ -97,8 +102,18 @@ jobs:
 
       - name: Dump logs on failure
         if: failure()
+        env:
+          MSSQL_SA_PASSWORD: 'YourStrong@Passw0rd'
+          JWT__KEY: 'ci-signing-key-must-be-at-least-32-bytes-long'
+          ADMIN__EMAIL: 'admin@storeapi.local'
+          ADMIN__PASSWORD: 'Admin#Passw0rd'
         run: docker compose logs
 
       - name: Tear down
         if: always()
+        env:
+          MSSQL_SA_PASSWORD: 'YourStrong@Passw0rd'
+          JWT__KEY: 'ci-signing-key-must-be-at-least-32-bytes-long'
+          ADMIN__EMAIL: 'admin@storeapi.local'
+          ADMIN__PASSWORD: 'Admin#Passw0rd'
         run: docker compose down -v

@@ -174,11 +174,14 @@ dotnet ef database update \
 
 ### Docker
 
-1. **Copy `.env.example` to `.env` and configure:**
+1. **Create your environment file:**
    ```bash
    cp .env.example .env
-   # Edit .env with your values
    ```
+   Then fill in every value in `.env`. `docker compose` **requires**
+   `MSSQL_SA_PASSWORD`, `JWT__KEY`, `ADMIN__EMAIL` and `ADMIN__PASSWORD` and will refuse to
+   start if any is missing — there are no built-in defaults. Generate the JWT key with
+   `openssl rand -base64 48`.
 
 2. **Start services:**
    ```bash
@@ -189,18 +192,20 @@ dotnet ef database update \
    - Swagger UI: http://localhost:5000/swagger
    - Health check: http://localhost:5000/health
 
+The SQL Server port is not published to the host; only the API reaches it over the compose
+network. Add a `ports` entry locally if you need a SQL client.
+
 ## Default Admin Credentials
 
-The API creates an administrator account on first startup from configuration
-(`Admin:Email`, `Admin:Password`). The Docker defaults are:
+There is **no built-in administrator**. The API creates one on startup only when
+`Admin:Email` and `Admin:Password` are provided (via `.env`, user secrets, or
+`ADMIN__EMAIL` / `ADMIN__PASSWORD`). If either is missing the seeder logs a warning and
+creates nothing.
 
-- **Email:** admin@storeapi.local
-- **Password:** Admin#Passw0rd
-
-These are **development defaults only** — override them via `.env`, user secrets, or
-environment variables (`ADMIN__EMAIL` / `ADMIN__PASSWORD`) before deploying anywhere real.
-If `Admin:Email` or `Admin:Password` is not configured, the seeder logs a warning and
-creates no account.
+If an account already exists for the configured admin email and is **not** an admin, the
+seeder logs an error and refuses to promote it — resolve the conflict manually instead.
+Passwords must be at least 8 characters and follow the same complexity rules as
+registration.
 
 ## API Endpoints
 
@@ -315,7 +320,7 @@ curl -X POST http://localhost:5000/api/orders/checkout \
 dotnet test
 ```
 
-- **106 unit tests** covering validators, domain rules, stock transitions, and cart/checkout logic
+- **107 unit tests** covering validators, domain rules, stock transitions, and cart/checkout logic
 - **27 integration tests** covering auth, catalog, cart, order endpoints, and authorization checks
 
 Integration tests run the real API in-process via `WebApplicationFactory` against an in-memory

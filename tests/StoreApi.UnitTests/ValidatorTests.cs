@@ -97,12 +97,12 @@ public class ValidatorTests
             .IsValid.Should().BeFalse();
 
     [Fact]
-    public void ProductQuery_PageSizeOverLimit_ShouldFail() =>
-        _productQuery.Validate(new ProductQueryParams { PageSize = 51 }).IsValid.Should().BeFalse();
+    public void ProductQuery_PageSizeOverLimit_IsClampedByServiceNotRejected() =>
+        _productQuery.Validate(new ProductQueryParams { PageSize = 51 }).IsValid.Should().BeTrue();
 
     [Fact]
-    public void ProductQuery_PageZero_ShouldFail() =>
-        _productQuery.Validate(new ProductQueryParams { Page = 0 }).IsValid.Should().BeFalse();
+    public void ProductQuery_PageZero_IsClampedByServiceNotRejected() =>
+        _productQuery.Validate(new ProductQueryParams { Page = 0 }).IsValid.Should().BeTrue();
 
     [Fact]
     public void AddToCart_ValidPayload_ShouldPass() =>
@@ -139,6 +139,6 @@ public class ValidatorTests
         _orderStatus.Validate(new UpdateOrderStatusDto((OrderStatus)99)).IsValid.Should().BeFalse();
 
     [Fact]
-    public void OrderQuery_PageSizeOverLimit_ShouldFail() =>
-        _orderQuery.Validate(new OrderQueryParams { PageSize = 51 }).IsValid.Should().BeFalse();
+    public void OrderQuery_PageSizeOverLimit_IsClampedByServiceNotRejected() =>
+        _orderQuery.Validate(new OrderQueryParams { PageSize = 51 }).IsValid.Should().BeTrue();
 }

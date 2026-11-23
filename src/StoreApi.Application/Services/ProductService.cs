@@ -134,6 +134,7 @@ public sealed class ProductService(IApplicationDbContext db) : IProductService
         };
 
         db.Products.Add(product);
+        product.EnsureValid();
         await db.SaveChangesAsync(cancellationToken);
 
         var categoryName = await db.Categories
@@ -168,6 +169,7 @@ public sealed class ProductService(IApplicationDbContext db) : IProductService
         if (request.CategoryId.HasValue) product.CategoryId = request.CategoryId.Value;
         if (request.IsActive.HasValue) product.IsActive = request.IsActive.Value;
 
+        product.EnsureValid();
         await db.SaveChangesAsync(cancellationToken);
 
         var categoryName = await db.Categories

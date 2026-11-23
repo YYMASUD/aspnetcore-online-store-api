@@ -35,6 +35,13 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+if (!app.Environment.IsDevelopment())
+{
+    // Bearer tokens must not travel in clear text. Docker serves plain HTTP behind a
+    // terminating proxy, so HTTPS redirection is enabled only outside Development.
+    app.UseHsts();
+}
+
 app.UseSerilogRequestLogging();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseCors("Frontend");

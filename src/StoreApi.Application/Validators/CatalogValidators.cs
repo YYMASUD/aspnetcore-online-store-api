@@ -47,8 +47,9 @@ public sealed class ProductQueryParamsValidator : AbstractValidator<ProductQuery
 
     public ProductQueryParamsValidator()
     {
-        RuleFor(x => x.Page).GreaterThanOrEqualTo(1);
-        RuleFor(x => x.PageSize).InclusiveBetween(1, ProductQueryParams.MaxPageSize);
+        // page and pageSize are intentionally not range-validated: the specification
+        // requires pageSize to be *clamped* to 1..50 rather than rejected, and the service
+        // performs that clamping.
         RuleFor(x => x.MinPrice).GreaterThanOrEqualTo(0).When(x => x.MinPrice.HasValue);
         RuleFor(x => x.MaxPrice).GreaterThanOrEqualTo(0).When(x => x.MaxPrice.HasValue);
 

@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -60,6 +61,19 @@ public static class SecurityExtensions
         {
             options.AddPolicy("AdminOnly", policy => policy.RequireRole(UserRoles.Admin));
             options.AddPolicy("CustomerOnly", policy => policy.RequireRole(UserRoles.Customer));
+
+            // Secure by default in non-development environments: any endpoint added later
+            // without an explicit attribute requires authentication rather than silently
+            // becoming public. Development keeps the default open so Swagger is reachable.
+            var isDevelopment = string.Equals(
+                configuration["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase);
+
+            if (!isDevelopment)
+            {
+                options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build();
+            }
         });
 
         return services;

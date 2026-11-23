@@ -4,10 +4,13 @@ services:
     container_name: storeapi-mssql
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-YourStrong@Passw0rd}
+      # Required: compose refuses to start without a real password. Set it in .env.
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env or the environment}
       MSSQL_PID: Developer
-    ports:
-      - "1433:1433"
+    # The database port is intentionally not published; only the API reaches it, on the
+    # internal compose network. Add a ports mapping locally if you need a SQL client.
+    expose:
+      - "1433"
     volumes:
       - mssql-data:/var/opt/mssql
     healthcheck:
@@ -26,16 +29,17 @@ services:
       dockerfile: Dockerfile
     container_name: storeapi-api
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: Server=mssql,1433;Database=StoreApiDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourStrong@Passw0rd};TrustServerCertificate=True
-      Jwt__Key: ${JWT__KEY:-dev-only-signing-key-please-replace-0123456789abcdef}
+      ConnectionStrings__DefaultConnection: Server=mssql,1433;Database=StoreApiDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env or the environment};TrustServerCertificate=True
+      # Required: no default signing key, so a deployment can never inherit a public secret.
+      Jwt__Key: ${JWT__KEY:?Set JWT__KEY in .env to a unique secret of at least 32 characters}
       Jwt__Issuer: StoreApi
       Jwt__Audience: StoreApi.Clients
       Jwt__ExpiryMinutes: "60"
-      Admin__Username: admin
-      Admin__Email: ${ADMIN__EMAIL:-admin@storeapi.local}
-      Admin__Password: ${ADMIN__PASSWORD:-Admin#Passw0rd}
+      Admin__Username: ${ADMIN__USERNAME:-admin}
+      Admin__Email: ${ADMIN__EMAIL:?Set ADMIN__EMAIL in .env or the environment}
+      Admin__Password: ${ADMIN__PASSWORD:?Set ADMIN__PASSWORD in .env or the environment}
     ports:
       - "5000:8080"
     depends_on:

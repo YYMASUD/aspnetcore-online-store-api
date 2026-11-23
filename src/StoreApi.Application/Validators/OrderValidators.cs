@@ -23,7 +23,7 @@ public sealed class OrderQueryParamsValidator : AbstractValidator<OrderQueryPara
 {
     public OrderQueryParamsValidator()
     {
-        RuleFor(x => x.Page).GreaterThanOrEqualTo(1);
-        RuleFor(x => x.PageSize).InclusiveBetween(1, OrderQueryParams.MaxPageSize);
+        // page and pageSize are clamped by the service, not rejected, matching the
+        // pagination rule in the specification.
     }
 }

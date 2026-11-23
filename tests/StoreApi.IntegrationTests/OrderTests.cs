@@ -131,7 +131,8 @@ public class OrderTests : IClassFixture<CustomWebApplicationFactory>
 
         var response = await _client.GetAsync($"/api/orders/{order!.Id}");
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        // Non-owners receive 404 for other users' orders so ids cannot be probed.
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

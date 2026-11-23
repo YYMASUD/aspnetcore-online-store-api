@@ -17,6 +17,10 @@ public sealed class AuthService(
     // cannot be used to enumerate registered accounts.
     private const string InvalidCredentialsMessage = "Invalid email or password.";
 
+    // A single message for both duplicate email and duplicate username so registration
+    // cannot be used to probe which addresses exist.
+    private const string AccountExistsMessage = "An account with these details already exists.";
+
     public async Task<AuthResponseDto> RegisterAsync(
         RegisterDto request,
         CancellationToken cancellationToken = default)
@@ -24,14 +28,16 @@ public sealed class AuthService(
         var email = request.Email.Trim();
         var username = request.Username.Trim();
 
-        if (await db.Users.AnyAsync(u => u.Email == email, cancellationToken))
-        {
-            throw new ConflictException("An account with this email already exists.");
-        }
+        // The account whose address matches the configured admin mailbox must never be
+        // self-registered, or a later admin-seeding run could be tricked into elevating it.
+        var isReservedAdminEmail = await db.Users.AnyAsync(
+            u => u.Email == email && u.Role == UserRoles.Admin, cancellationToken);
 
-        if (await db.Users.AnyAsync(u => u.Username == username, cancellationToken))
+        if (isReservedAdminEmail ||
+            await db.Users.AnyAsync(u => u.Email == email, cancellationToken) ||
+            await db.Users.AnyAsync(u => u.Username == username, cancellationToken))
         {
-            throw new ConflictException("This username is already taken.");
+            throw new ConflictException(AccountExistsMessage);
         }
 
         var user = new User
@@ -60,7 +66,11 @@ public sealed class AuthService(
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
 
-        if (user is null || !passwordHasher.Verify(request.Password, user.PasswordHash))
+        // Always run the hash comparison, even when the email is unknown, so an attacker
+        // cannot distinguish the two cases by response time.
+        var passwordValid = passwordHasher.Verify(request.Password, user?.PasswordHash);
+
+        if (user is null || !passwordValid)
         {
             throw new UnauthorizedException(InvalidCredentialsMessage);
         }

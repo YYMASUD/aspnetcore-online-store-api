@@ -46,9 +46,13 @@ public sealed class AdminSeeder(
         {
             if (existing.Role != UserRoles.Admin)
             {
-                existing.Role = UserRoles.Admin;
-                await db.SaveChangesAsync(cancellationToken);
-                logger.LogInformation("Promoted existing account {Email} to the Admin role.", email);
+                // Never silently elevate an account that registered itself with the configured
+                // address. A registration could have happened while the admin settings were
+                // absent; promoting it would hand Admin to whoever controls that account.
+                logger.LogError(
+                    "Admin seeding refused: an existing non-admin account uses {Email}. " +
+                    "Resolve the conflict manually before setting Admin:Email.",
+                    email);
             }
 
             return;
