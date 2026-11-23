@@ -18,3 +18,16 @@ public static class DependencyInjection
         return services;
     }
 }
+
+/// <summary>Registers catalog (category and product) services.</summary>
+public static class CatalogDependencyInjection
+{
+    /// <summary>Adds category and product services to the container.</summary>
+    public static IServiceCollection AddCatalog(this IServiceCollection services)
+    {
+        services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<IProductService, ProductService>();
+
+        return services;
+    }
+}
