@@ -25,6 +25,14 @@ public static class SecurityExtensions
                 "Jwt:Key is not configured. Set it via user secrets or the JWT__KEY environment variable.");
         }
 
+        if (jwt.Key.StartsWith("dev-only", StringComparison.OrdinalIgnoreCase) ||
+            jwt.Key.StartsWith("ci-", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine(
+                "WARNING: running with the built-in development Jwt:Key. " +
+                "Set JWT__KEY to a unique 32+ character secret before deploying.");
+        }
+
         services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
