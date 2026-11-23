@@ -5,96 +5,100 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 jobs:
-  build:
+  build-and-test:
+    name: Build and test
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
-    - name: Cache NuGet packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
-    - name: Restore dependencies
-      run: dotnet restore
+      - name: Restore
+        run: dotnet restore StoreApi.sln
 
-    - name: Build
-      run: dotnet build --configuration Release --no-restore
+      - name: Build
+        run: dotnet build StoreApi.sln --configuration Release --no-restore
 
-    - name: Upload build artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-artifact
-        path: |
-          **/bin/Release/
-          **/obj/
-        retention-days: 1
+      - name: Test
+        run: >
+          dotnet test StoreApi.sln
+          --configuration Release
+          --no-build
+          --verbosity normal
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
 
-  test:
-    runs-on: ubuntu-latest
-    needs: build
-    
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
-
-    - name: Download build artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: build-artifact
-
-    - name: Run tests
-      run: dotnet test --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
-
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results
-        path: '**/test-results.trx'
-        retention-days: 7
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          retention-days: 7
 
   docker:
+    name: Docker build and smoke test
     runs-on: ubuntu-latest
-    needs: test
-    
+    needs: build-and-test
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Validate docker-compose
-      run: docker compose config
+      - name: Validate compose file
+        run: docker compose config
 
-    - name: Build Docker image
-      run: docker build -t storeapi:ci .
+      - name: Build image
+        run: docker build -t storeapi:ci .
 
-    - name: Test Docker image
-      run: |
-        docker run -d --name storeapi-test -p 8080:80 \
-          -e ConnectionStrings__DefaultConnection="Data Source=:memory:" \
-          -e Jwt__Key="test-key-must-be-at-least-32-bytes-long-for-hs256" \
-          -e Jwt__Issuer=TestIssuer \
-          -e Jwt__Audience=TestAudience \
-          -e Admin__Email=admin@test.com \
-          -e Admin__Password=Admin#Passw0rd \
-          storeapi:ci
-        sleep 10
-        curl --fail http://localhost:8080/health || exit 1
-        docker stop storeapi-test
+      - name: Start stack
+        env:
+          MSSQL_SA_PASSWORD: 'YourStrong@Passw0rd'
+          JWT__KEY: 'ci-signing-key-must-be-at-least-32-bytes-long'
+          ADMIN__EMAIL: 'admin@storeapi.local'
+          ADMIN__PASSWORD: 'Admin#Passw0rd'
+        run: docker compose up -d --wait --wait-timeout 300
+
+      - name: Verify health endpoint
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:5000/health; then
+              echo "Health check passed"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Health check failed"
+          docker compose logs
+          exit 1
+
+      - name: Verify Swagger endpoint
+        run: curl --fail --silent --output /dev/null http://localhost:5000/swagger/v1/swagger.json
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

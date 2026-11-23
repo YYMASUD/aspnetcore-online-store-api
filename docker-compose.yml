@@ -3,18 +3,21 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: storeapi-mssql
     environment:
-      - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:-YourStrong@Passw0rd}
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-YourStrong@Passw0rd}
+      MSSQL_PID: Developer
     ports:
       - "1433:1433"
     volumes:
       - mssql-data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P '$${MSSQL_SA_PASSWORD}' -Q 'SELECT 1' || exit 1"]
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" -b -o /dev/null
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 10s
+      retries: 12
+      start_period: 20s
     restart: unless-stopped
 
   api:
@@ -23,17 +26,18 @@ services:
       dockerfile: Dockerfile
     container_name: storeapi-api
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=mssql;Database=StoreApiDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourStrong@Passw0rd};TrustServerCertificate=True
-      - Jwt__Key=${JWT__KEY:-dev-only-signing-key-please-replace-0123456789abcdef}
-      - Jwt__Issuer=StoreApi
-      - Jwt__Audience=StoreApi.Clients
-      - Jwt__ExpiryMinutes=60
-      - Admin__Username=admin
-      - Admin__Email=${ADMIN__EMAIL:-admin@storeapi.local}
-      - Admin__Password=${ADMIN__PASSWORD:-Admin#Passw0rd}
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Server=mssql,1433;Database=StoreApiDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourStrong@Passw0rd};TrustServerCertificate=True
+      Jwt__Key: ${JWT__KEY:-dev-only-signing-key-please-replace-0123456789abcdef}
+      Jwt__Issuer: StoreApi
+      Jwt__Audience: StoreApi.Clients
+      Jwt__ExpiryMinutes: "60"
+      Admin__Username: admin
+      Admin__Email: ${ADMIN__EMAIL:-admin@storeapi.local}
+      Admin__Password: ${ADMIN__PASSWORD:-Admin#Passw0rd}
     ports:
-      - "5000:80"
+      - "5000:8080"
     depends_on:
       mssql:
         condition: service_healthy
