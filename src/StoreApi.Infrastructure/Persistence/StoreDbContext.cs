@@ -39,6 +39,17 @@ public class StoreDbContext(DbContextOptions<StoreDbContext> options)
         else
         {
             product.IsConcurrencyToken();
+
+            // SQLite stores decimals as TEXT and cannot ORDER BY or aggregate them.
+            // Convert money columns to double for the test provider only.
+            foreach (var money in modelBuilder.Model.GetEntityTypes()
+                         .SelectMany(e => e.GetProperties())
+                         .Where(p => p.ClrType == typeof(decimal)))
+            {
+                money.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<decimal, double>(
+                    value => (double)value,
+                    value => (decimal)value));
+            }
         }
     }
 

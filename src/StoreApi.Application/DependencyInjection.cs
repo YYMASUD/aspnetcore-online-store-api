@@ -31,3 +31,27 @@ public static class CatalogDependencyInjection
         return services;
     }
 }
+
+/// <summary>Registers cart services.</summary>
+public static class CartDependencyInjection
+{
+    /// <summary>Adds cart services to the container.</summary>
+    public static IServiceCollection AddCart(this IServiceCollection services)
+    {
+        services.AddScoped<ICartService, CartService>();
+
+        return services;
+    }
+}
+
+/// <summary>Registers order services.</summary>
+public static class OrdersDependencyInjection
+{
+    /// <summary>Adds order services to the container.</summary>
+    public static IServiceCollection AddOrders(this IServiceCollection services)
+    {
+        services.AddScoped<IOrderService, OrderService>();
+
+        return services;
+    }
+}

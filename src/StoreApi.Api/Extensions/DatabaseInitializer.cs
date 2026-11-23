@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Serilog;
 using StoreApi.Infrastructure.Identity;
 using StoreApi.Infrastructure.Persistence;
 
@@ -8,36 +7,38 @@ namespace StoreApi.Api.Extensions;
 /// <summary>Startup-time database preparation: migrations and default data.</summary>
 public static class DatabaseInitializer
 {
-    /// <summary>Applies pending migrations and seeds the default administrator.</summary>
+    /// <summary>
+    /// Applies pending migrations on SQL Server (and creates the schema directly on other
+    /// providers such as the SQLite database used by integration tests), then seeds the
+    /// default administrator from configuration.
+    /// </summary>
     public static async Task InitializeDatabaseAsync(this WebApplication app)
     {
         using var scope = app.Services.CreateScope();
 
         var provider = scope.ServiceProvider;
         var logger = provider.GetRequiredService<ILogger<Program>>();
-
         var context = provider.GetRequiredService<StoreDbContext>();
 
-        var pending = await context.Database.GetPendingMigrationsAsync();
-        if (pending.Any())
+        if (context.Database.IsSqlServer())
         {
-            logger.LogInformation("Applying {Count} pending migration(s).", pending.Count());
-            await context.Database.MigrateAsync();
+            var pending = (await context.Database.GetPendingMigrationsAsync()).ToList();
+            if (pending.Count > 0)
+            {
+                logger.LogInformation("Applying {Count} pending migration(s).", pending.Count);
+                await context.Database.MigrateAsync();
+            }
+            else
+            {
+                logger.LogInformation("Database schema is up to date.");
+            }
         }
         else
         {
-            logger.LogInformation("Database schema is up to date.");
+            await context.Database.EnsureCreatedAsync();
         }
 
         var seeder = provider.GetRequiredService<AdminSeeder>();
         await seeder.SeedAsync();
-    }
-
-    /// <summary>Configures Serilog's bootstrap logger before the host is built.</summary>
-    public static void ConfigureBootstrapLogger(this WebApplicationBuilder builder)
-    {
-        Log.Logger = new LoggerConfiguration()
-            .WriteTo.Console()
-            .CreateBootstrapLogger();
     }
 }

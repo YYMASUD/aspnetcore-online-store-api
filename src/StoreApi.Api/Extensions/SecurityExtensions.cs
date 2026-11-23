@@ -67,14 +67,26 @@ public static class SecurityExtensions
                     .AllowCredentials()));
 
     /// <summary>Applies a 10-requests-per-minute fixed window to auth endpoints.</summary>
-    public static IServiceCollection AddAuthRateLimiting(this IServiceCollection services) =>
+    public static IServiceCollection AddAuthRateLimiting(
+        this IServiceCollection services,
+        IConfiguration configuration) =>
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+            // The policy must always be registered because AuthController declares it by name.
+            // In the in-process integration test host a single fixture issues far more than
+            // ten auth requests, so the limit is raised to effectively unlimited there.
+            var isTesting = string.Equals(
+                configuration["ASPNETCORE_ENVIRONMENT"], "Testing", StringComparison.OrdinalIgnoreCase);
+
+            var permitLimit = isTesting
+                ? int.MaxValue
+                : configuration.GetValue("RateLimiting:Auth:PermitLimit", 10);
+
             options.AddFixedWindowLimiter("auth", limiter =>
             {
-                limiter.PermitLimit = 10;
+                limiter.PermitLimit = permitLimit;
                 limiter.Window = TimeSpan.FromMinutes(1);
                 limiter.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
                 limiter.QueueLimit = 0;

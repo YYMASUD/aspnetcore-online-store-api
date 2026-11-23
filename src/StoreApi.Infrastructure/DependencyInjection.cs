@@ -25,8 +25,11 @@ public static class DependencyInjection
                 "Set it via user secrets or the ConnectionStrings__DefaultConnection environment variable.");
         }
 
+        // NOTE: retry-on-failure cannot be combined with user-initiated transactions.
+        // Checkout and cancellation use explicit transactions for stock atomicity, so the
+        // plain non-retrying strategy is used; concurrency is handled via RowVersion.
         services.AddDbContext<StoreDbContext>(options =>
-            options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
+            options.UseSqlServer(connectionString));
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<StoreDbContext>());
         services.AddHttpContextAccessor();

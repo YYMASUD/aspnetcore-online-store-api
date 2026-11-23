@@ -19,10 +19,12 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 
 builder.Services.AddApplication();
 builder.Services.AddCatalog();
+builder.Services.AddCart();
+builder.Services.AddOrders();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddFrontendCors();
-builder.Services.AddAuthRateLimiting();
+builder.Services.AddAuthRateLimiting(builder.Configuration);
 builder.Services.AddSwaggerDocumentation();
 
 builder.Services.AddControllers(options => options.Filters.Add<ValidationFilter>());
@@ -33,8 +35,8 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
-app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseSerilogRequestLogging();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseCors("Frontend");
 app.UseRateLimiter();
 app.UseAuthentication();
